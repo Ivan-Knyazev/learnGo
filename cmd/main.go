@@ -24,6 +24,7 @@ func main() {
 	valueBool := storageObj.Get("bool")
 	valueComplex := storageObj.Get("complex")
 	valueString := storageObj.Get("string")
+	nothingValue := storageObj.Get("nothing")
 
 	fmt.Println("\nTests of types:")
 	fmt.Println(*valueInt, "type:", storageObj.GetKind("int"))
@@ -31,6 +32,7 @@ func main() {
 	fmt.Println(*valueBool, "type:", storageObj.GetKind("bool"))
 	fmt.Println(*valueComplex, "type:", storageObj.GetKind("complex"))
 	fmt.Println(*valueString, "type:", storageObj.GetKind("string"))
+	fmt.Println(nothingValue, "type:", storageObj.GetKind("nothing"))
 
 	// fmt.Println("Tests:")
 	// fmt.Println(valueInt, "type:", reflect.TypeOf(valueInt))
