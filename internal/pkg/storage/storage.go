@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"strconv"
 
 	"go.uber.org/zap"
@@ -22,13 +23,32 @@ type Storage struct {
 }
 
 func NewStorage() (Storage, error) {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		return Storage{}, err
-	}
 
+	rawJSON := []byte(`{
+		"level": "warn",
+		"encoding": "json",
+		"outputPaths": ["stdout", "/tmp/logs"],
+		"errorOutputPaths": ["stderr"],
+		"encoderConfig": {
+		  "messageKey": "message",
+		  "levelKey": "level",
+		  "levelEncoder": "lowercase"
+		}
+	}`)
+
+	var cfg zap.Config
+	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
+		panic(err)
+	}
+	logger := zap.Must(cfg.Build())
 	defer logger.Sync()
 
+	// logger, err := zap.NewProduction()
+	// if err != nil {
+	// 	return Storage{}, err
+	// }
+
+	logger.Info("logger construction succeeded")
 	logger.Info("created new storage")
 
 	return Storage{
