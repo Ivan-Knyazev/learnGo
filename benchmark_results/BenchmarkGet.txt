@@ -1,0 +1,28 @@
+Running tool: /usr/local/go/bin/go test -benchmem -run=^$ -bench ^BenchmarkGet$ go-storage/internal/pkg/storage
+
+goos: linux
+goarch: amd64
+pkg: go-storage/internal/pkg/storage
+cpu: AMD Ryzen 7 4800U with Radeon Graphics
+=== RUN   BenchmarkGet
+BenchmarkGet
+=== RUN   BenchmarkGet/string_test_1
+BenchmarkGet/string_test_1
+BenchmarkGet/string_test_1-16           12459770               126.0 ns/op            64 B/op          1 allocs/op
+=== RUN   BenchmarkGet/string_test_2
+BenchmarkGet/string_test_2
+BenchmarkGet/string_test_2-16            9255453               127.9 ns/op            64 B/op          1 allocs/op
+=== RUN   BenchmarkGet/int_test
+BenchmarkGet/int_test
+BenchmarkGet/int_test-16                 3673250               293.4 ns/op            88 B/op          3 allocs/op
+=== RUN   BenchmarkGet/float_test
+BenchmarkGet/float_test
+BenchmarkGet/float_test-16               2019514               605.3 ns/op           120 B/op          4 allocs/op
+=== RUN   BenchmarkGet/bool_test
+BenchmarkGet/bool_test
+BenchmarkGet/bool_test-16                5606160               215.9 ns/op            80 B/op          2 allocs/op
+=== RUN   BenchmarkGet/complex_test
+BenchmarkGet/complex_test
+BenchmarkGet/complex_test-16             1454718               799.4 ns/op           136 B/op          5 allocs/op
+PASS
+ok      go-storage/internal/pkg/storage 9.707s
