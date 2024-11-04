@@ -3,30 +3,23 @@ package utils
 import (
 	"encoding/json"
 	"go-storage/internal/pkg/storage"
-	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/joho/godotenv"
+	"go.uber.org/zap"
 )
 
-func getFilePath() string {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("error loading .env file")
-	}
-
-	path := os.Getenv("JSON_PATH")
-	dir := filepath.Dir(path)
-	filename := filepath.Base(path)
+func getFilePath(file string) string {
+	dir := filepath.Dir(file)
+	filename := filepath.Base(file)
 
 	filePath := filepath.Join(dir, filename)
 	return filePath
 }
 
-func writeAtomic(data []byte) error {
-	filepath := getFilePath()
-	tmpFilepath := getFilePath() + ".tmp"
+func writeAtomic(data []byte, file string) error {
+	filepath := getFilePath(file)
+	tmpFilepath := filepath + ".tmp"
 	err := os.WriteFile(tmpFilepath, data, 0744)
 	if err != nil {
 		return err
@@ -39,8 +32,8 @@ func writeAtomic(data []byte) error {
 	return os.Rename(tmpFilepath, filepath)
 }
 
-func ReadFromFile(s *storage.Storage) error {
-	filePath := getFilePath()
+func ReadFromFile(s *storage.Storage, file string) error {
+	filePath := getFilePath(file)
 	fromFile, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
@@ -53,22 +46,27 @@ func ReadFromFile(s *storage.Storage) error {
 	}
 
 	s.LoadData(data)
-	log.Println(*s)
+
+	s.Logger.Info("STATE was readed from JSON", zap.Any("data", data))
+	defer s.Logger.Sync()
+
 	return nil
 }
 
-func WriteToFile(s *storage.Storage) error {
+func WriteToFile(s *storage.Storage, file string) error {
 	jsonStorage := s.ExportData()
-	log.Println(jsonStorage)
 	data, err := json.MarshalIndent(jsonStorage, "", "\t")
 	if err != nil {
 		return err
 	}
 
-	err = writeAtomic(data)
+	err = writeAtomic(data, file)
 	if err != nil {
 		return err
 	}
+
+	s.Logger.Info("STATE was writed to JSON", zap.Any("data", jsonStorage))
+	defer s.Logger.Sync()
 
 	return nil
 }

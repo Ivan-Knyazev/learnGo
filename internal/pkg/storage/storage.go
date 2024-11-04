@@ -26,7 +26,7 @@ type Value struct {
 type Storage struct {
 	innerValue map[string]Value
 	innerSlice map[string][]int
-	logger     *zap.Logger
+	Logger     *zap.Logger
 }
 
 func newConfig() zap.Config {
@@ -57,14 +57,14 @@ func NewStorage() (Storage, error) {
 	return Storage{
 		innerValue: make(map[string]Value),
 		innerSlice: make(map[string][]int),
-		logger:     logger,
+		Logger:     logger,
 	}, nil
 }
 
 // For innerValue
 func (s Storage) Set(key string, val string) {
-	s.logger.Info("key was set", zap.String("key", key), zap.Any("value", val))
-	defer s.logger.Sync()
+	s.Logger.Info("key was set", zap.String("key", key), zap.Any("value", val))
+	defer s.Logger.Sync()
 
 	valueInt, err := strconv.ParseInt(val, 10, 64) // Check to int64
 	if err != nil {                                // Is string
