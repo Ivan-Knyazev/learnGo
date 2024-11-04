@@ -1,0 +1,58 @@
+{
+	"innerValue": {
+		"bool": {
+			"valueType": "S",
+			"valueInt": 0,
+			"valueString": "true"
+		},
+		"complex": {
+			"valueType": "S",
+			"valueInt": 0,
+			"valueString": "(2-3i)"
+		},
+		"float": {
+			"valueType": "S",
+			"valueInt": 0,
+			"valueString": "-12432.2432"
+		},
+		"int": {
+			"valueType": "D",
+			"valueInt": 1243232432,
+			"valueString": ""
+		},
+		"string": {
+			"valueType": "S",
+			"valueInt": 0,
+			"valueString": "test_string-tatata rarara"
+		}
+	},
+	"innerSlice": {
+		"slice1": [
+			1,
+			10,
+			3,
+			5,
+			8,
+			4,
+			10,
+			11,
+			1,
+			10,
+			3,
+			5,
+			8,
+			4,
+			10,
+			11
+		],
+		"slice2": null,
+		"slice3": [
+			1,
+			3,
+			5,
+			1,
+			3,
+			5
+		]
+	}
+}
