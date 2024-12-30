@@ -14,41 +14,47 @@ func main() {
 		log.Fatal(err)
 	}
 
-	envs := utils.GetEnvs(&storageObj)
+	envs := utils.GetEnvs(storageObj) // Comment to debug
+	// For debug in VS Code
+	// envs := make(map[string]string)
+	// envs["path"] = "../../storage.json"
+	// envs["port"] = "8090"
 
-	if err = utils.ReadFromFile(&storageObj, envs["path"]); err != nil {
+	if err = utils.ReadFromFile(storageObj, envs["path"]); err != nil {
 		log.Println(err)
 	}
 
 	host := fmt.Sprintf("0.0.0.0:%s", envs["port"])
-	s := server.NewServer(host, &storageObj)
-	s.StartServer()
+	s := server.NewServer(host, storageObj)
+	if err := s.StartServer(); err != nil {
+		log.Println(err)
+	} else {
+		defer s.Storage.WriteLog(fmt.Sprintf("server was started on %s", s.Host))
+	}
 
-	// storageObj.Set("int", "1243232432")
-	// storageObj.Set("string", "test_string-tatata rarara")
+	// storageObj.SetScalar("int", "1243232432")
+	// storageObj.SetScalar("string", "test_string-tatata rarara")
 	// storageObj.RPUSH("slice1", 1, 10, 3, 5, 8, 4, 10, 11)
 	// storageObj.RPUSH("slice2")
 	// storageObj.RPUSH("slice3", 1, 3, 5)
-	// valueInt, ok := storageObj.Get("int")
+	// valueInt, ok := storageObj.GetScalar("int")
 	// if !ok {
 	// 	log.Println("invalid value at any key")
 	// }
-	// valueString, ok := storageObj.Get("string")
+	// valueString, ok := storageObj.GetScalar("string")
 	// if !ok {
 	// 	log.Println("invalid value at any key")
 	// }
-	// nothingValue, ok := storageObj.Get("nothing")
+	// nothingValue, ok := storageObj.GetScalar("nothing")
 	// if !ok {
 	// 	log.Println("invalid value at any key")
 	// }
 	// fmt.Println("\nTests of types:")
-	// fmt.Println(valueInt, "type:", storageObj.GetKind("int"))
-	// fmt.Println(valueString, "type:", storageObj.GetKind("string"))
-	// fmt.Println(nothingValue, "type:", storageObj.GetKind("nothing"))
+	// fmt.Println(valueInt, "type:", storageObj.GetScalarKind("int"))
+	// fmt.Println(valueString, "type:", storageObj.GetScalarKind("string"))
+	// fmt.Println(nothingValue, "type:", storageObj.GetScalarKind("nothing")+"\n")
 
-	// * Tests of innerSlice was added in storage_test.go
-
-	if err = utils.WriteToFile(&storageObj, envs["path"]); err != nil {
+	if err = utils.WriteToFile(storageObj, envs["path"]); err != nil {
 		log.Fatal(err)
 	}
 }

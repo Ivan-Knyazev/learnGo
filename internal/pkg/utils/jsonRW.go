@@ -5,8 +5,6 @@ import (
 	"go-storage/internal/pkg/storage"
 	"os"
 	"path/filepath"
-
-	"go.uber.org/zap"
 )
 
 func getFilePath(file string) string {
@@ -32,7 +30,7 @@ func writeAtomic(data []byte, file string) error {
 	return os.Rename(tmpFilepath, filepath)
 }
 
-func ReadFromFile(s *storage.Storage, file string) error {
+func ReadFromFile(s storage.Storage, file string) error {
 	filePath := getFilePath(file)
 	fromFile, err := os.ReadFile(filePath)
 	if err != nil {
@@ -47,13 +45,12 @@ func ReadFromFile(s *storage.Storage, file string) error {
 
 	s.LoadData(data)
 
-	s.Logger.Info("STATE was readed from JSON", zap.Any("data", data))
-	defer s.Logger.Sync()
+	defer s.WriteLogWithParametr("STATE was readed from JSON", data)
 
 	return nil
 }
 
-func WriteToFile(s *storage.Storage, file string) error {
+func WriteToFile(s storage.Storage, file string) error {
 	jsonStorage := s.ExportData()
 	data, err := json.MarshalIndent(jsonStorage, "", "\t")
 	if err != nil {
@@ -65,8 +62,7 @@ func WriteToFile(s *storage.Storage, file string) error {
 		return err
 	}
 
-	s.Logger.Info("STATE was writed to JSON", zap.Any("data", jsonStorage))
-	defer s.Logger.Sync()
+	defer s.WriteLogWithParametr("STATE was writed to JSON", jsonStorage)
 
 	return nil
 }

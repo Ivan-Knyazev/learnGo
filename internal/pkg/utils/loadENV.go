@@ -1,26 +1,26 @@
 package utils
 
 import (
+	"fmt"
 	"go-storage/internal/pkg/storage"
 	"log"
 	"os"
 
 	"github.com/joho/godotenv"
-	"go.uber.org/zap"
 )
 
-func GetEnvs(s *storage.Storage) map[string]string {
+func GetEnvs(s storage.Storage) map[string]string {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("error loading .env file")
 	}
 
-	evns := make(map[string]string)
-	evns["path"] = os.Getenv("JSON_PATH")
-	evns["port"] = os.Getenv("PORT")
+	envs := make(map[string]string)
+	envs["path"] = os.Getenv("JSON_PATH")
+	envs["port"] = os.Getenv("PORT")
 
-	s.Logger.Info("ENV was loaded", zap.String("JSON_PATH", evns["path"]), zap.Any("PORT", evns["port"]))
-	defer s.Logger.Sync()
+	logString := fmt.Sprintf("ENV was loaded, JSON_PATH=%s, PORT=%s", envs["path"], envs["port"])
+	defer s.WriteLog(logString)
 
-	return evns
+	return envs
 }

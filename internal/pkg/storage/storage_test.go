@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -8,7 +9,7 @@ type testCaseValue struct {
 	name  string
 	key   string
 	value string
-	kind  Kind
+	kind  ScalarKind
 }
 
 var casesValue = []testCaseValue{
@@ -28,9 +29,9 @@ func TestSetGetWithType(t *testing.T) {
 
 	for _, test := range casesValue {
 		t.Run(test.name, func(t *testing.T) {
-			testStorage.Set(test.key, test.value)
+			testStorage.SetScalar(test.key, test.value)
 
-			value, ok := testStorage.Get(test.key)
+			value, ok := testStorage.GetScalar(test.key)
 			if !ok {
 				t.Errorf("invalid value at key=%v", test.key)
 			}
@@ -41,7 +42,7 @@ func TestSetGetWithType(t *testing.T) {
 			}
 			// assert.Equal(t, *value, test.value, "The two values should be the equal.")
 
-			kind := testStorage.GetKind(test.key)
+			kind := testStorage.GetScalarKind(test.key)
 
 			if kind != test.kind {
 				t.Errorf("two kinds should be the equal")
@@ -79,16 +80,18 @@ func TestLPUSH(t *testing.T) {
 	for _, test := range casesSlicePUSH {
 		t.Run(test.name, func(t *testing.T) {
 			if test.name == "LPUSH" {
-				testStorage.LPUSH(test.key, test.elements...)
+				testStorage.LeftPushIntoSlice(test.key, test.elements...)
 			} else if test.name == "RPUSH" {
-				testStorage.RPUSH(test.key, test.elements...)
+				testStorage.RightPushIntoSlice(test.key, test.elements...)
 			} else if test.name == "RADDTOSET" {
-				testStorage.RADDTOSET(test.key, test.elements...)
+				testStorage.RightUniquePushIntoSlice(test.key, test.elements...)
 			}
 
-			slice := testStorage.GetSlice(test.key)
+			slice, err := testStorage.GetSlice(test.key)
+			fmt.Println(err)
 
 			if len(slice) < len(test.check) {
+				fmt.Println(slice, test.check)
 				t.Errorf("len of slice is less than required")
 			} else if len(slice) > len(test.check) {
 				t.Errorf("len of slice is more than required")
@@ -151,30 +154,30 @@ func checkPOP(testStorage Storage, test testCasePOP, t *testing.T, popType int) 
 	var result int
 	if test.arg1 == nil && test.arg2 == nil {
 		if popType == RPOP {
-			result = testStorage.RPOP(test.key)
+			result, _ = testStorage.RightPopFromSlice(test.key)
 		} else if popType == LPOP {
-			result = testStorage.LPOP(test.key)
+			result, _ = testStorage.LeftPopFromSlice(test.key)
 		}
 		if test.checkAnswer != result {
 			t.Errorf("incorrect return value=%v", result)
 		}
 	} else if test.arg1 != nil && test.arg2 == nil {
 		if popType == RPOP {
-			result = testStorage.RPOP(test.key, test.arg1.(int))
+			result, _ = testStorage.RightPopFromSlice(test.key, test.arg1.(int))
 		} else if popType == LPOP {
-			result = testStorage.LPOP(test.key, test.arg1.(int))
+			result, _ = testStorage.LeftPopFromSlice(test.key, test.arg1.(int))
 		}
 	} else {
 		if popType == RPOP {
-			result = testStorage.RPOP(test.key, test.arg1.(int), test.arg2.(int))
+			result, _ = testStorage.RightPopFromSlice(test.key, test.arg1.(int), test.arg2.(int))
 		} else if popType == LPOP {
-			result = testStorage.LPOP(test.key, test.arg1.(int), test.arg2.(int))
+			result, _ = testStorage.LeftPopFromSlice(test.key, test.arg1.(int), test.arg2.(int))
 		}
 	}
 	if result != test.checkAnswer {
 		t.Errorf("incorrect return value=%v", result)
 	}
-	slice := testStorage.GetSlice(test.key)
+	slice, _ := testStorage.GetSlice(test.key)
 	if len(slice) != len(test.checkSlice) {
 		t.Errorf("len of slices is not equal")
 	}
@@ -192,8 +195,8 @@ func TestPOP(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	testStorage.RPUSH("test1", 1, 2, 3, 5, 8, 4, 10, 11)
-	testStorage.RPUSH("test2", 1, 2, 3, 5, 8, 4, 10, 11)
+	testStorage.RightPushIntoSlice("test1", 1, 2, 3, 5, 8, 4, 10, 11)
+	testStorage.RightPushIntoSlice("test2", 1, 2, 3, 5, 8, 4, 10, 11)
 
 	for _, test := range casesSlicePOP {
 		t.Run(test.name, func(t *testing.T) {
@@ -228,15 +231,15 @@ func TestLSET(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	testStorage.RPUSH("test1", 1, 2, 3, 5, 8, 4, 10, 11)
+	testStorage.RightPushIntoSlice("test1", 1, 2, 3, 5, 8, 4, 10, 11)
 
 	for _, test := range casesSliceLSET {
 		t.Run(test.name, func(t *testing.T) {
-			err := testStorage.LSET(test.key, test.arg1, test.arg2)
+			err := testStorage.SetSliceValue(test.key, test.arg1, test.arg2)
 			if err != nil {
 				t.Logf("error=%v", err)
 			}
-			slice := testStorage.GetSlice(test.key)
+			slice, _ := testStorage.GetSlice(test.key)
 			if len(slice) != len(test.checkSlice) {
 				t.Errorf("len of slices is not equal")
 			}
@@ -274,18 +277,18 @@ func TestLLGET(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	testStorage.RPUSH("test1", 1, 2, 3, 5, 8, 4, 10, 11)
+	testStorage.RightPushIntoSlice("test1", 1, 2, 3, 5, 8, 4, 10, 11)
 
 	for _, test := range casesSliceLGET {
 		t.Run(test.name, func(t *testing.T) {
-			value, err := testStorage.LGET(test.key, test.arg)
+			value, err := testStorage.GetSliceValue(test.key, test.arg)
 			if err != nil {
 				t.Logf("error=%v", err)
 			}
 			if value != test.checkValue {
 				t.Errorf("incorrect return value=%v", value)
 			}
-			slice := testStorage.GetSlice(test.key)
+			slice, _ := testStorage.GetSlice(test.key)
 			if len(slice) != len(test.checkSlice) {
 				t.Errorf("len of slices is not equal")
 			}
@@ -310,13 +313,13 @@ func BenchmarkGet(b *testing.B) {
 	for _, tCase := range casesValue {
 		b.Run(tCase.name, func(bb *testing.B) {
 
-			testStorage.Set(tCase.key, tCase.value)
+			testStorage.SetScalar(tCase.key, tCase.value)
 
 			var value string
 			bb.ResetTimer()
 
 			for i := 0; i < bb.N; i++ {
-				value, _ = testStorage.Get(tCase.key)
+				value, _ = testStorage.GetScalar(tCase.key)
 			}
 
 			if value == tCase.value {
@@ -338,7 +341,7 @@ func BenchmarkSet(b *testing.B) {
 			bb.ResetTimer()
 
 			for i := 0; i < bb.N; i++ {
-				testStorage.Set(tCase.key, tCase.value)
+				testStorage.SetScalar(tCase.key, tCase.value)
 			}
 		})
 	}
@@ -356,8 +359,8 @@ func BenchmarkSetGet(b *testing.B) {
 			bb.ResetTimer()
 
 			for i := 0; i < bb.N; i++ {
-				testStorage.Set(tCase.key, tCase.value)
-				testStorage.Get(tCase.key)
+				testStorage.SetScalar(tCase.key, tCase.value)
+				testStorage.GetScalar(tCase.key)
 			}
 		})
 	}

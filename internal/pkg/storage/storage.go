@@ -1,34 +1,77 @@
 package storage
 
 import (
-	"errors"
-	"slices"
-	"strconv"
+	"fmt"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+// Storage interface
+type Storage interface {
+	// Methods for scalar
+	SetScalar(key string, val string) error
+	GetScalar(key string) (string, bool)
+	GetScalarKind(key string) ScalarKind
+	// Methods for dict
+	SetDictFields(key string, elements ...string) (int, error)  // HSET
+	GetDictField(key string, field string) (ScalarValue, error) // HGET
+	GetDict(key string) (map[string]ScalarValue, error)
+	// Methods for slice
+	GetSlice(key string) ([]int, error)
+	LeftPushIntoSlice(key string, elements ...int) error        // LPUSH
+	RightPushIntoSlice(key string, elements ...int) error       // RPUSH
+	RightUniquePushIntoSlice(key string, elements ...int) error // RADDTOSET
+	LeftPopFromSlice(key string, count ...int) (int, error)     // LPOP
+	RightPopFromSlice(key string, count ...int) (int, error)    // RPOP
+	SetSliceValue(key string, index int, element int) error     // LSET
+	GetSliceValue(key string, index int) (int, error)           // LGET
+	// Methods for marshalling data for work with JSON
+	LoadData(newData JsonStorage)
+	ExportData() JsonStorage
+	// Write logs
+	WriteLog(info string)
+	WriteLogWithParametr(info string, data any)
+}
+
+// type ScalarValue
+type ScalarKind string
+
+const (
+	ScalarKindInt       ScalarKind = "D"
+	ScalarKindString    ScalarKind = "S"
+	ScalarKindUndefined ScalarKind = "UN"
+)
+
+type ScalarValue struct {
+	ScalarValueType   ScalarKind `json:"ScalarValueType"`
+	ScalarValueInt    int64      `json:"ScalarValueInt"`
+	ScalarValueString string     `json:"ScalarValueString"`
+}
+
+// main type Value
 type Kind string
 
 const (
-	KindInt       Kind = "D"
-	KindString    Kind = "S"
-	KindUndefined Kind = "UN"
+	KindScalar Kind = "SC"
+	KindSlice  Kind = "SL"
+	KindDict   Kind = "D"
 )
 
 type Value struct {
-	ValueType   Kind   `json:"valueType"`
-	ValueInt    int64  `json:"valueInt"`
-	ValueString string `json:"valueString"`
+	ValueType Kind                   `json:"valueType"`
+	Scalar    ScalarValue            `json:"scalar"`
+	Slice     []int                  `json:"slice"`
+	Dict      map[string]ScalarValue `json:"dict"`
 }
 
-type Storage struct {
-	innerValue map[string]Value
-	innerSlice map[string][]int
-	Logger     *zap.Logger
+// storage struct - implementation of Storage interface
+type storage struct {
+	data   map[string]Value
+	Logger *zap.Logger
 }
 
+// Create a new zap logger config
 func newConfig() zap.Config {
 	return zap.Config{
 		Level:            zap.NewAtomicLevelAt(zapcore.InfoLevel),
@@ -40,6 +83,7 @@ func newConfig() zap.Config {
 	}
 }
 
+// Create a new storage
 func NewStorage() (Storage, error) {
 
 	config := newConfig()
@@ -54,219 +98,34 @@ func NewStorage() (Storage, error) {
 	logger.Info("logger construction succeeded")
 	logger.Info("created new storage")
 
-	return Storage{
-		innerValue: make(map[string]Value),
-		innerSlice: make(map[string][]int),
-		Logger:     logger,
+	return &storage{
+		data:   make(map[string]Value),
+		Logger: logger,
 	}, nil
-}
-
-// For innerValue
-func (s Storage) Set(key string, val string) {
-	s.Logger.Info("key was set", zap.String("key", key), zap.Any("value", val))
-	defer s.Logger.Sync()
-
-	valueInt, err := strconv.ParseInt(val, 10, 64) // Check to int64
-	if err != nil {                                // Is string
-		s.innerValue[key] = Value{ValueType: KindString, ValueString: val}
-	} else { // Is int64
-		s.innerValue[key] = Value{ValueType: KindInt, ValueInt: valueInt}
-	}
-}
-
-func (s Storage) Get(key string) (string, bool) {
-	val, ok := s.get(key)
-	if !ok {
-		return "", false
-	}
-
-	switch valueType := val.ValueType; valueType {
-	case KindInt:
-		strInt := strconv.FormatInt(val.ValueInt, 10)
-		return strInt, true
-	case KindString:
-		return val.ValueString, true
-	default:
-		return "", false
-	}
-}
-
-func (s Storage) get(key string) (Value, bool) {
-	val, ok := s.innerValue[key]
-	return val, ok
-}
-
-func (s Storage) GetKind(key string) Kind {
-	value, ok := s.innerValue[key]
-	if !ok {
-		return KindUndefined
-	}
-	return value.ValueType
-}
-
-// Func for testing innerSlice
-func (s Storage) GetSlice(key string) []int {
-	return s.innerSlice[key]
-}
-
-// For innerSlice
-func (s Storage) LPUSH(key string, elements ...int) {
-	slices.Reverse(elements)
-
-	slice, ok := s.innerSlice[key]
-	if !ok {
-		s.innerSlice[key] = elements
-		return
-	}
-
-	s.innerSlice[key] = slices.Concat(elements, slice)
-}
-
-func (s Storage) RPUSH(key string, elements ...int) {
-	_, ok := s.innerSlice[key]
-	if !ok {
-		s.innerSlice[key] = elements
-		return
-	}
-
-	s.innerSlice[key] = append(s.innerSlice[key], elements...)
-}
-
-func (s Storage) RADDTOSET(key string, elements ...int) {
-	for _, element := range elements {
-		if !slices.Contains(s.innerSlice[key], element) {
-			s.innerSlice[key] = append(s.innerSlice[key], element)
-		}
-	}
-}
-
-func (s Storage) LPOP(key string, count ...int) int {
-	_, ok := s.innerSlice[key]
-	if !ok {
-		return -1
-	}
-
-	if len(count) == 0 {
-		return len(s.innerSlice[key])
-	} else if len(count) == 1 {
-		end := count[0]
-		if end > 0 && end <= len(s.innerSlice[key]) {
-			deleted := s.innerSlice[key][end-1]
-			s.innerSlice[key] = slices.Delete(s.innerSlice[key], 0, end)
-			return deleted
-		} else if end > 0 && end > len(s.innerSlice[key]) {
-			return len(s.innerSlice[key])
-		} else {
-			return -1
-		}
-	} else if len(count) == 2 {
-		start := count[0]
-		end := count[1]
-		if start < 0 {
-			start = len(s.innerSlice[key]) + start
-		}
-		if end < 0 {
-			end = len(s.innerSlice[key]) + end
-		}
-		if end-start < 0 || start < 0 || end < 0 {
-			return -1
-		}
-
-		if start >= 0 && start < len(s.innerSlice[key]) && end >= 0 && end < len(s.innerSlice[key]) {
-			deleted := s.innerSlice[key][end]
-			s.innerSlice[key] = slices.Delete(s.innerSlice[key], start, end+1)
-			return deleted
-		} else {
-			return len(s.innerSlice[key]) - start
-		}
-	} else {
-		return -1
-	}
-}
-
-func (s Storage) RPOP(key string, count ...int) int {
-	_, ok := s.innerSlice[key]
-	if !ok {
-		return -1
-	}
-
-	if len(count) == 0 {
-		return len(s.innerSlice[key])
-	} else if len(count) == 1 {
-		offset := count[0]
-		lenght := len(s.innerSlice[key])
-		if offset > 0 && lenght-offset >= 0 {
-			deleted := s.innerSlice[key][lenght-1]
-			s.innerSlice[key] = slices.Delete(s.innerSlice[key], lenght-offset, lenght)
-			return deleted
-		} else if offset > 0 && lenght-offset < 0 {
-			return len(s.innerSlice[key])
-		} else {
-			return -1
-		}
-	} else if len(count) == 2 {
-		start := count[0]
-		end := count[1]
-		if start < 0 {
-			start = len(s.innerSlice[key]) + start
-		}
-		if end < 0 {
-			end = len(s.innerSlice[key]) + end
-		}
-		if end-start < 0 || start < 0 || end < 0 {
-			return -1
-		}
-		// fmt.Println(start, end)
-
-		if start >= 0 && start < len(s.innerSlice[key]) && end >= 0 && end < len(s.innerSlice[key]) {
-			deleted := s.innerSlice[key][end]
-			s.innerSlice[key] = slices.Delete(s.innerSlice[key], start, end+1)
-			return deleted
-		} else {
-			return len(s.innerSlice[key]) - start
-		}
-	} else {
-		return -1
-	}
-}
-
-func (s Storage) LSET(key string, index int, element int) error {
-	value, ok := s.innerSlice[key]
-	if !ok {
-		return errors.New("key not found")
-	}
-	if index < 0 || index >= len(value) {
-		return errors.New("index out of range")
-	}
-	value[index] = element
-	return nil
-}
-
-func (s Storage) LGET(key string, index int) (int, error) {
-	value, ok := s.innerSlice[key]
-	if !ok {
-		return 0, errors.New("key not found")
-	}
-	if index < 0 || index >= len(value) {
-		return 0, errors.New("index out of range")
-	}
-	return value[index], nil
 }
 
 // For Marshalling
 type JsonStorage struct {
-	InnerValue map[string]Value `json:"innerValue"`
-	InnerSlice map[string][]int `json:"innerSlice"`
+	Data map[string]Value `json:"data"`
 }
 
-func (s *Storage) LoadData(data JsonStorage) {
-	s.innerValue = data.InnerValue
-	s.innerSlice = data.InnerSlice
+func (s *storage) LoadData(newData JsonStorage) {
+	s.data = newData.Data
 }
 
-func (s *Storage) ExportData() JsonStorage {
+func (s *storage) ExportData() JsonStorage {
 	return JsonStorage{
-		InnerSlice: s.innerSlice,
-		InnerValue: s.innerValue,
+		Data: s.data,
 	}
+}
+
+// For logging
+func (s *storage) WriteLog(info string) {
+	s.Logger.Info(fmt.Sprintf("[server] %s", info))
+	defer s.Logger.Sync()
+}
+
+func (s *storage) WriteLogWithParametr(info string, data any) {
+	s.Logger.Info(fmt.Sprintf("[server] %s", info), zap.Any("data", data))
+	defer s.Logger.Sync()
 }

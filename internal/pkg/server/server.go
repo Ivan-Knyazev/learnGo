@@ -8,28 +8,30 @@ import (
 )
 
 type Server struct {
-	host    string
-	storage *storage.Storage
+	Host    string
+	Storage storage.Storage
 }
 
-type Entry struct {
-	Value string `json:"value" binding:"required"`
-}
-
-func NewServer(host string, storage *storage.Storage) *Server {
+func NewServer(host string, storage storage.Storage) *Server {
 	server := Server{
-		host:    host,
-		storage: storage,
+		Host:    host,
+		Storage: storage,
 	}
 	return &server
 }
 
 func (r *Server) newAPI() *gin.Engine {
+	// gin.SetMode(gin.ReleaseMode)  // On release mode
 	engine := gin.Default()
 
 	scalarRouter := engine.Group("/scalar")
 	scalarRouter.GET("/get/:key", r.scalarGet)
 	scalarRouter.PUT("/set/:key", r.scalarSet)
+
+	dictRouter := engine.Group("/dict")
+	dictRouter.GET("/get/value/:key/:field", r.dictGetValue)
+	dictRouter.GET("/get/:key/", r.dictGet)
+	dictRouter.PUT("/set/:key", r.dictSet)
 
 	healthRouter := engine.Group("/health")
 	healthRouter.GET("", r.health)
@@ -38,38 +40,10 @@ func (r *Server) newAPI() *gin.Engine {
 }
 
 func (r *Server) StartServer() error {
-	return r.newAPI().Run(r.host)
+	return r.newAPI().Run(r.Host)
 }
 
-func (r *Server) scalarGet(ctx *gin.Context) {
-	key := ctx.Param("key")
-
-	value, ok := r.storage.Get(key)
-	if !ok {
-		ctx.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, Entry{Value: value})
-}
-
-func (r *Server) scalarSet(ctx *gin.Context) {
-	key := ctx.Param("key")
-
-	var payload Entry
-
-	// err := json.NewDecoder(ctx.Request.Body).Decode(&payload)
-	err := ctx.ShouldBindJSON(&payload)
-	if err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
-	r.storage.Set(key, payload.Value)
-
-	ctx.Status(http.StatusOK)
-}
-
+// Controller for health
 func (r *Server) health(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
