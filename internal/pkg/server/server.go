@@ -1,7 +1,9 @@
 package server
 
 import (
+	"fmt"
 	"go-storage/internal/pkg/storage"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +23,6 @@ func NewServer(host string, storage storage.Storage) *Server {
 }
 
 func (r *Server) newAPI() *gin.Engine {
-	// gin.SetMode(gin.ReleaseMode)  // On release mode
 	engine := gin.Default()
 
 	scalarRouter := engine.Group("/scalar")
@@ -33,14 +34,34 @@ func (r *Server) newAPI() *gin.Engine {
 	dictRouter.GET("/get/:key/", r.dictGet)
 	dictRouter.PUT("/set/:key", r.dictSet)
 
+	sliceRouter := engine.Group("/slice")
+	sliceRouter.GET("/get/:key/", r.sliceGet)
+	sliceRouter.GET("/get/value/:key/:index", r.sliceGetValue)
+	sliceRouter.PUT("/set/value/:key/:index", r.sliceSetValue)
+	sliceRouter.POST("/push/left/:key", r.sliceLeftPush)
+	sliceRouter.POST("/push/right/:key", r.sliceRightPush)
+	sliceRouter.POST("/push/right/unique/:key", r.sliceRightUniquePush)
+	sliceRouter.DELETE("/pop/left/:key", r.sliceLeftPop)
+	sliceRouter.DELETE("/pop/right/:key", r.sliceRightPop)
+
 	healthRouter := engine.Group("/health")
 	healthRouter.GET("", r.health)
 
 	return engine
 }
 
-func (r *Server) StartServer() error {
-	return r.newAPI().Run(r.Host)
+func (r *Server) StartServer() *http.Server {
+	server := &http.Server{Addr: r.Host, Handler: r.newAPI()}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+	r.Storage.WriteLog(fmt.Sprintf("server was started on %s", r.Host))
+
+	return server
+	// return r.newAPI().Run(r.Host)
 }
 
 // Controller for health

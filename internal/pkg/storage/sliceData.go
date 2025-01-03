@@ -126,7 +126,7 @@ func (s *storage) LeftPopFromSlice(key string, count ...int) (int, error) {
 				Slice:     slices.Delete(s.data[key].Slice, 0, end),
 				Dict:      make(map[string]ScalarValue),
 			}
-			s.Logger.Info(fmt.Sprintf("slice <%s> was set - left pop", key), zap.Any("deleted", deleted))
+			s.Logger.Info(fmt.Sprintf("slice <%s> was set - left pop", key), zap.Any("last deleted element", deleted))
 			return deleted, nil
 		} else if end > 0 && end > len(s.data[key].Slice) {
 			return len(s.data[key].Slice), nil
@@ -153,7 +153,7 @@ func (s *storage) LeftPopFromSlice(key string, count ...int) (int, error) {
 				Slice:     slices.Delete(s.data[key].Slice, start, end+1),
 				Dict:      make(map[string]ScalarValue),
 			}
-			s.Logger.Info(fmt.Sprintf("slice <%s> was set - left pop", key), zap.Any("deleted", deleted))
+			s.Logger.Info(fmt.Sprintf("slice <%s> was set - left pop", key), zap.Any("last deleted element", deleted))
 			return deleted, nil
 		} else {
 			return len(s.data[key].Slice) - start, nil
@@ -184,7 +184,7 @@ func (s *storage) RightPopFromSlice(key string, count ...int) (int, error) {
 				Slice:     slices.Delete(s.data[key].Slice, lenght-offset, lenght),
 				Dict:      make(map[string]ScalarValue),
 			}
-			s.Logger.Info(fmt.Sprintf("slice <%s> was set - right pop", key), zap.Any("deleted", deleted))
+			s.Logger.Info(fmt.Sprintf("slice <%s> was set - right pop", key), zap.Any("last deleted element", deleted))
 			return deleted, nil
 		} else if offset > 0 && lenght-offset < 0 {
 			return len(s.data[key].Slice), nil
@@ -212,7 +212,7 @@ func (s *storage) RightPopFromSlice(key string, count ...int) (int, error) {
 				Slice:     slices.Delete(s.data[key].Slice, start, end+1),
 				Dict:      make(map[string]ScalarValue),
 			}
-			s.Logger.Info(fmt.Sprintf("slice <%s> was set - right pop", key), zap.Any("deleted", deleted))
+			s.Logger.Info(fmt.Sprintf("slice <%s> was set - right pop", key), zap.Any("last deleted element", deleted))
 			return deleted, nil
 		} else {
 			return len(s.data[key].Slice) - start, nil

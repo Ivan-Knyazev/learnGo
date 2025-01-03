@@ -62,6 +62,23 @@
 			},
 			"slice": [],
 			"dict": {}
+		},
+		"testSlice": {
+			"valueType": "SL",
+			"scalar": {
+				"ScalarValueType": "",
+				"ScalarValueInt": 0,
+				"ScalarValueString": ""
+			},
+			"slice": [
+				1,
+				2,
+				1,
+				2,
+				3,
+				3
+			],
+			"dict": {}
 		}
 	}
 }
