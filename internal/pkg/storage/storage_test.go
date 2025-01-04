@@ -21,6 +21,8 @@ var casesValue = []testCaseValue{
 	{"complex_test", "complex", "(2-3i)", "S"},
 }
 
+var ttl int64 = 3153600000
+
 func TestSetGetWithType(t *testing.T) {
 	testStorage, err := NewStorage()
 	if err != nil {
@@ -29,9 +31,9 @@ func TestSetGetWithType(t *testing.T) {
 
 	for _, test := range casesValue {
 		t.Run(test.name, func(t *testing.T) {
-			testStorage.SetScalar(test.key, test.value)
+			testStorage.SetScalar(ttl, test.key, test.value)
 
-			value, ok := testStorage.GetScalar(test.key)
+			value, ok, _ := testStorage.GetScalar(test.key)
 			if !ok {
 				t.Errorf("invalid value at key=%v", test.key)
 			}
@@ -80,14 +82,14 @@ func TestLPUSH(t *testing.T) {
 	for _, test := range casesSlicePUSH {
 		t.Run(test.name, func(t *testing.T) {
 			if test.name == "LPUSH" {
-				testStorage.LeftPushIntoSlice(test.key, test.elements...)
+				testStorage.LeftPushIntoSlice(ttl, test.key, test.elements...)
 			} else if test.name == "RPUSH" {
-				testStorage.RightPushIntoSlice(test.key, test.elements...)
+				testStorage.RightPushIntoSlice(ttl, test.key, test.elements...)
 			} else if test.name == "RADDTOSET" {
-				testStorage.RightUniquePushIntoSlice(test.key, test.elements...)
+				testStorage.RightUniquePushIntoSlice(ttl, test.key, test.elements...)
 			}
 
-			slice, err := testStorage.GetSlice(test.key)
+			slice, _, err := testStorage.GetSlice(test.key)
 			fmt.Println(err)
 
 			if len(slice) < len(test.check) {
@@ -177,7 +179,7 @@ func checkPOP(testStorage Storage, test testCasePOP, t *testing.T, popType int) 
 	if result != test.checkAnswer {
 		t.Errorf("incorrect return value=%v", result)
 	}
-	slice, _ := testStorage.GetSlice(test.key)
+	slice, _, _ := testStorage.GetSlice(test.key)
 	if len(slice) != len(test.checkSlice) {
 		t.Errorf("len of slices is not equal")
 	}
@@ -195,8 +197,8 @@ func TestPOP(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	testStorage.RightPushIntoSlice("test1", 1, 2, 3, 5, 8, 4, 10, 11)
-	testStorage.RightPushIntoSlice("test2", 1, 2, 3, 5, 8, 4, 10, 11)
+	testStorage.RightPushIntoSlice(ttl, "test1", 1, 2, 3, 5, 8, 4, 10, 11)
+	testStorage.RightPushIntoSlice(ttl, "test2", 1, 2, 3, 5, 8, 4, 10, 11)
 
 	for _, test := range casesSlicePOP {
 		t.Run(test.name, func(t *testing.T) {
@@ -231,7 +233,7 @@ func TestLSET(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	testStorage.RightPushIntoSlice("test1", 1, 2, 3, 5, 8, 4, 10, 11)
+	testStorage.RightPushIntoSlice(ttl, "test1", 1, 2, 3, 5, 8, 4, 10, 11)
 
 	for _, test := range casesSliceLSET {
 		t.Run(test.name, func(t *testing.T) {
@@ -239,7 +241,7 @@ func TestLSET(t *testing.T) {
 			if err != nil {
 				t.Logf("error=%v", err)
 			}
-			slice, _ := testStorage.GetSlice(test.key)
+			slice, _, _ := testStorage.GetSlice(test.key)
 			if len(slice) != len(test.checkSlice) {
 				t.Errorf("len of slices is not equal")
 			}
@@ -277,18 +279,18 @@ func TestLLGET(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	testStorage.RightPushIntoSlice("test1", 1, 2, 3, 5, 8, 4, 10, 11)
+	testStorage.RightPushIntoSlice(ttl, "test1", 1, 2, 3, 5, 8, 4, 10, 11)
 
 	for _, test := range casesSliceLGET {
 		t.Run(test.name, func(t *testing.T) {
-			value, err := testStorage.GetSliceValue(test.key, test.arg)
+			value, _, err := testStorage.GetSliceValue(test.key, test.arg)
 			if err != nil {
 				t.Logf("error=%v", err)
 			}
 			if value != test.checkValue {
 				t.Errorf("incorrect return value=%v", value)
 			}
-			slice, _ := testStorage.GetSlice(test.key)
+			slice, _, _ := testStorage.GetSlice(test.key)
 			if len(slice) != len(test.checkSlice) {
 				t.Errorf("len of slices is not equal")
 			}
@@ -313,13 +315,13 @@ func BenchmarkGet(b *testing.B) {
 	for _, tCase := range casesValue {
 		b.Run(tCase.name, func(bb *testing.B) {
 
-			testStorage.SetScalar(tCase.key, tCase.value)
+			testStorage.SetScalar(ttl, tCase.key, tCase.value)
 
 			var value string
 			bb.ResetTimer()
 
 			for i := 0; i < bb.N; i++ {
-				value, _ = testStorage.GetScalar(tCase.key)
+				value, _, _ = testStorage.GetScalar(tCase.key)
 			}
 
 			if value == tCase.value {
@@ -341,7 +343,7 @@ func BenchmarkSet(b *testing.B) {
 			bb.ResetTimer()
 
 			for i := 0; i < bb.N; i++ {
-				testStorage.SetScalar(tCase.key, tCase.value)
+				testStorage.SetScalar(ttl, tCase.key, tCase.value)
 			}
 		})
 	}
@@ -359,7 +361,7 @@ func BenchmarkSetGet(b *testing.B) {
 			bb.ResetTimer()
 
 			for i := 0; i < bb.N; i++ {
-				testStorage.SetScalar(tCase.key, tCase.value)
+				testStorage.SetScalar(ttl, tCase.key, tCase.value)
 				testStorage.GetScalar(tCase.key)
 			}
 		})

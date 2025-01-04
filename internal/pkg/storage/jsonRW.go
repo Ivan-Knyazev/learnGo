@@ -1,8 +1,7 @@
-package utils
+package storage
 
 import (
 	"encoding/json"
-	"go-storage/internal/pkg/storage"
 	"os"
 	"path/filepath"
 )
@@ -30,14 +29,14 @@ func writeAtomic(data []byte, file string) error {
 	return os.Rename(tmpFilepath, filepath)
 }
 
-func ReadFromFile(s storage.Storage, file string) error {
+func ReadFromFile(s Storage, file string) error {
 	filePath := getFilePath(file)
 	fromFile, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
 	}
 
-	var data storage.JsonStorage
+	var data JsonStorage
 	err = json.Unmarshal(fromFile, &data)
 	if err != nil {
 		return err
@@ -45,12 +44,12 @@ func ReadFromFile(s storage.Storage, file string) error {
 
 	s.LoadData(data)
 
-	defer s.WriteLogWithParametr("STATE was readed from JSON", data)
+	defer s.WriteLog("STATE was readed from JSON")
 
 	return nil
 }
 
-func WriteToFile(s storage.Storage, file string) error {
+func WriteToFile(s Storage, file string) error {
 	jsonStorage := s.ExportData()
 	data, err := json.MarshalIndent(jsonStorage, "", "\t")
 	if err != nil {
@@ -62,7 +61,7 @@ func WriteToFile(s storage.Storage, file string) error {
 		return err
 	}
 
-	defer s.WriteLogWithParametr("STATE was writed to JSON", jsonStorage)
+	defer s.WriteLog("STATE was writed to JSON")
 
 	return nil
 }

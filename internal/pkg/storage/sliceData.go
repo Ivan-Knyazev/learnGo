@@ -4,27 +4,30 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"go.uber.org/zap"
 )
 
 // ---------
 // For Slice
-func (s *storage) GetSlice(key string) ([]int, error) {
+func (s *storage) GetSlice(key string) ([]int, int64, error) {
 	value, ok := s.data[key]
 	if !ok {
-		return []int{}, errors.New("key not found")
+		return []int{}, 0, errors.New("key not found")
 	}
 	if ok && s.data[key].ValueType != KindSlice {
-		return []int{}, errors.New("requested field is not of type slice")
+		return []int{}, 0, errors.New("requested field is not of type slice")
 	}
 
-	return value.Slice, nil
+	return value.Slice, value.ExpiresAt, nil
 }
 
 // Inserts on the left into the list
-func (s *storage) LeftPushIntoSlice(key string, elements ...int) error {
+func (s *storage) LeftPushIntoSlice(ttl int64, key string, elements ...int) error {
 	slices.Reverse(elements)
+
+	timeDuration := time.Duration(ttl) * time.Second
 
 	value, ok := s.data[key]
 	if !ok {
@@ -32,6 +35,7 @@ func (s *storage) LeftPushIntoSlice(key string, elements ...int) error {
 			ValueType: KindSlice,
 			Slice:     append([]int{}, elements...),
 			Dict:      make(map[string]ScalarValue),
+			ExpiresAt: time.Now().Add(timeDuration).UnixMilli(),
 		}
 	} else {
 		if s.data[key].ValueType != KindSlice {
@@ -41,6 +45,7 @@ func (s *storage) LeftPushIntoSlice(key string, elements ...int) error {
 			ValueType: KindSlice,
 			Slice:     slices.Concat(elements, value.Slice),
 			Dict:      make(map[string]ScalarValue),
+			ExpiresAt: time.Now().Add(timeDuration).UnixMilli(),
 		}
 	}
 	s.Logger.Info(fmt.Sprintf("slice <%s> was set - left push", key), zap.Any("keys-values", elements))
@@ -49,13 +54,16 @@ func (s *storage) LeftPushIntoSlice(key string, elements ...int) error {
 }
 
 // Inserts on the right into the list
-func (s *storage) RightPushIntoSlice(key string, elements ...int) error {
+func (s *storage) RightPushIntoSlice(ttl int64, key string, elements ...int) error {
+	timeDuration := time.Duration(ttl) * time.Second
+
 	value, ok := s.data[key]
 	if !ok {
 		s.data[key] = Value{
 			ValueType: KindSlice,
 			Slice:     append([]int{}, elements...),
 			Dict:      make(map[string]ScalarValue),
+			ExpiresAt: time.Now().Add(timeDuration).UnixMilli(),
 		}
 	} else {
 		if s.data[key].ValueType != KindSlice {
@@ -65,6 +73,7 @@ func (s *storage) RightPushIntoSlice(key string, elements ...int) error {
 			ValueType: KindSlice,
 			Slice:     append(value.Slice, elements...),
 			Dict:      make(map[string]ScalarValue),
+			ExpiresAt: time.Now().Add(timeDuration).UnixMilli(),
 		}
 	}
 	s.Logger.Info(fmt.Sprintf("slice <%s> was set - right push", key), zap.Any("keys-values", elements))
@@ -73,18 +82,31 @@ func (s *storage) RightPushIntoSlice(key string, elements ...int) error {
 }
 
 // Inserts elements that are not yet in the list into the list on the right.
-func (s *storage) RightUniquePushIntoSlice(key string, elements ...int) error {
+func (s *storage) RightUniquePushIntoSlice(ttl int64, key string, elements ...int) error {
+	timeDuration := time.Duration(ttl) * time.Second
+	ExpiresAt := time.Now().Add(timeDuration).UnixMilli()
+
 	_, ok := s.data[key]
 	if ok && s.data[key].ValueType != KindSlice {
 		return errors.New("requested field is not of type slice")
 	}
 
-	for _, element := range elements {
+	for index, element := range elements {
 		if !slices.Contains(s.data[key].Slice, element) {
+			if !ok && index == 0 {
+				s.data[key] = Value{
+					ValueType: KindSlice,
+					Slice:     append([]int{}, element),
+					Dict:      make(map[string]ScalarValue),
+					ExpiresAt: ExpiresAt,
+				}
+				continue
+			}
 			s.data[key] = Value{
 				ValueType: KindSlice,
 				Slice:     append(s.data[key].Slice, element),
 				Dict:      make(map[string]ScalarValue),
+				ExpiresAt: ExpiresAt,
 			}
 		}
 	}
@@ -125,6 +147,7 @@ func (s *storage) LeftPopFromSlice(key string, count ...int) (int, error) {
 				ValueType: KindSlice,
 				Slice:     slices.Delete(s.data[key].Slice, 0, end),
 				Dict:      make(map[string]ScalarValue),
+				ExpiresAt: s.data[key].ExpiresAt,
 			}
 			s.Logger.Info(fmt.Sprintf("slice <%s> was set - left pop", key), zap.Any("last deleted element", deleted))
 			return deleted, nil
@@ -152,6 +175,7 @@ func (s *storage) LeftPopFromSlice(key string, count ...int) (int, error) {
 				ValueType: KindSlice,
 				Slice:     slices.Delete(s.data[key].Slice, start, end+1),
 				Dict:      make(map[string]ScalarValue),
+				ExpiresAt: s.data[key].ExpiresAt,
 			}
 			s.Logger.Info(fmt.Sprintf("slice <%s> was set - left pop", key), zap.Any("last deleted element", deleted))
 			return deleted, nil
@@ -183,6 +207,7 @@ func (s *storage) RightPopFromSlice(key string, count ...int) (int, error) {
 				ValueType: KindSlice,
 				Slice:     slices.Delete(s.data[key].Slice, lenght-offset, lenght),
 				Dict:      make(map[string]ScalarValue),
+				ExpiresAt: s.data[key].ExpiresAt,
 			}
 			s.Logger.Info(fmt.Sprintf("slice <%s> was set - right pop", key), zap.Any("last deleted element", deleted))
 			return deleted, nil
@@ -211,6 +236,7 @@ func (s *storage) RightPopFromSlice(key string, count ...int) (int, error) {
 				ValueType: KindSlice,
 				Slice:     slices.Delete(s.data[key].Slice, start, end+1),
 				Dict:      make(map[string]ScalarValue),
+				ExpiresAt: s.data[key].ExpiresAt,
 			}
 			s.Logger.Info(fmt.Sprintf("slice <%s> was set - right pop", key), zap.Any("last deleted element", deleted))
 			return deleted, nil
@@ -242,16 +268,16 @@ func (s *storage) SetSliceValue(key string, index int, element int) error {
 }
 
 // Gets value of element
-func (s *storage) GetSliceValue(key string, index int) (int, error) {
+func (s *storage) GetSliceValue(key string, index int) (int, int64, error) {
 	value, ok := s.data[key]
 	if !ok || s.data[key].ValueType != KindSlice {
-		return 0, errors.New("key not found")
+		return 0, 0, errors.New("key not found")
 	}
 	if s.data[key].ValueType != KindSlice {
-		return 0, errors.New("requested field is not of type slice")
+		return 0, 0, errors.New("requested field is not of type slice")
 	}
 	if index < 0 || index >= len(value.Slice) {
-		return 0, errors.New("index out of range")
+		return 0, 0, errors.New("index out of range")
 	}
-	return value.Slice[index], nil
+	return value.Slice[index], value.ExpiresAt, nil
 }

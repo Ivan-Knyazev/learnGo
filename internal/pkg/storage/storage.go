@@ -2,6 +2,8 @@ package storage
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -10,25 +12,27 @@ import (
 // Storage interface
 type Storage interface {
 	// Methods for scalar
-	SetScalar(key string, val string) error
-	GetScalar(key string) (string, bool)
+	SetScalar(ttl int64, key string, val string) error
+	GetScalar(key string) (string, bool, int64)
 	GetScalarKind(key string) ScalarKind
 	// Methods for dict
-	SetDictFields(key string, elements ...string) (int, error)  // HSET
-	GetDictField(key string, field string) (ScalarValue, error) // HGET
-	GetDict(key string) (map[string]ScalarValue, error)
+	SetDictFields(ttl int64, key string, elements ...string) (int, error) // HSET
+	GetDictField(key string, field string) (ScalarValue, int64, error)    // HGET
+	GetDict(key string) (map[string]ScalarValue, int64, error)
 	// Methods for slice
-	GetSlice(key string) ([]int, error)
-	LeftPushIntoSlice(key string, elements ...int) error        // LPUSH
-	RightPushIntoSlice(key string, elements ...int) error       // RPUSH
-	RightUniquePushIntoSlice(key string, elements ...int) error // RADDTOSET
-	LeftPopFromSlice(key string, count ...int) (int, error)     // LPOP
-	RightPopFromSlice(key string, count ...int) (int, error)    // RPOP
-	SetSliceValue(key string, index int, element int) error     // LSET
-	GetSliceValue(key string, index int) (int, error)           // LGET
+	GetSlice(key string) ([]int, int64, error)
+	LeftPushIntoSlice(ttl int64, key string, elements ...int) error        // LPUSH
+	RightPushIntoSlice(ttl int64, key string, elements ...int) error       // RPUSH
+	RightUniquePushIntoSlice(ttl int64, key string, elements ...int) error // RADDTOSET
+	LeftPopFromSlice(key string, count ...int) (int, error)                // LPOP
+	RightPopFromSlice(key string, count ...int) (int, error)               // RPOP
+	SetSliceValue(key string, index int, element int) error                // LSET
+	GetSliceValue(key string, index int) (int, int64, error)               // LGET
 	// Methods for marshalling data for work with JSON
 	LoadData(newData JsonStorage)
 	ExportData() JsonStorage
+	// Method for Scheduling
+	StartScheduling(closeChan chan struct{}, shedulerInterval int64, storageObj Storage, JSONPath string)
 	// Write logs
 	WriteLog(info string)
 	WriteLogWithParametr(info string, data any)
@@ -63,12 +67,14 @@ type Value struct {
 	Scalar    ScalarValue            `json:"scalar"`
 	Slice     []int                  `json:"slice"`
 	Dict      map[string]ScalarValue `json:"dict"`
+	ExpiresAt int64                  `json:"expiresAt"`
 }
 
 // storage struct - implementation of Storage interface
 type storage struct {
 	data   map[string]Value
 	Logger *zap.Logger
+	mutex  sync.Mutex
 }
 
 // Create a new zap logger config
@@ -98,10 +104,18 @@ func NewStorage() (Storage, error) {
 	logger.Info("logger construction succeeded")
 	logger.Info("created new storage")
 
-	return &storage{
+	storage := &storage{
 		data:   make(map[string]Value),
 		Logger: logger,
-	}, nil
+		mutex:  sync.Mutex{},
+	}
+	return storage, nil
+}
+
+func (s *storage) StartScheduling(closeChan chan struct{}, shedulerInterval int64, storageObj Storage, JSONPath string) {
+	interval := time.Duration(shedulerInterval) * time.Second
+	go scheduler(s, closeChan, interval, storageObj, JSONPath)
+	s.WriteLog("Start scheduling")
 }
 
 // For Marshalling

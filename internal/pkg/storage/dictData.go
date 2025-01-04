@@ -4,13 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"go.uber.org/zap"
 )
 
 // --------
 // For Dict
-func (s *storage) SetDictFields(key string, elements ...string) (int, error) {
+func (s *storage) SetDictFields(ttl int64, key string, elements ...string) (int, error) {
 	_, ok := s.data[key]
 	if ok && s.data[key].ValueType != KindDict {
 		return 0, errors.New("requested field is not of type dict")
@@ -39,41 +40,43 @@ func (s *storage) SetDictFields(key string, elements ...string) (int, error) {
 			}
 		}
 	}
+	timeDuration := time.Duration(ttl) * time.Second
 	s.data[key] = Value{
 		ValueType: KindDict,
 		Slice:     make([]int, 0),
 		Dict:      dict,
+		ExpiresAt: time.Now().Add(timeDuration).UnixMilli(),
 	}
 	s.Logger.Info(fmt.Sprintf("dict <%s> was set", key), zap.Any("keys-values", elements))
 	defer s.Logger.Sync()
 	return keysCount, nil
 }
 
-func (s *storage) GetDictField(key string, field string) (ScalarValue, error) {
+func (s *storage) GetDictField(key string, field string) (ScalarValue, int64, error) {
 	dict, ok := s.data[key]
 	if !ok {
-		return ScalarValue{}, errors.New("key not found")
+		return ScalarValue{}, 0, errors.New("key not found")
 	}
 	if s.data[key].ValueType != KindDict {
-		return ScalarValue{}, errors.New("requested field is not of type dict")
+		return ScalarValue{}, 0, errors.New("requested field is not of type dict")
 	}
 
 	value, ok := dict.Dict[field]
 	if !ok {
-		return ScalarValue{}, fmt.Errorf("field %s not found in dict %s", field, key)
+		return ScalarValue{}, 0, fmt.Errorf("field %s not found in dict %s", field, key)
 	}
 
-	return value, nil
+	return value, s.data[key].ExpiresAt, nil
 }
 
-func (s *storage) GetDict(key string) (map[string]ScalarValue, error) {
+func (s *storage) GetDict(key string) (map[string]ScalarValue, int64, error) {
 	value, ok := s.data[key]
 	if !ok {
-		return map[string]ScalarValue{}, errors.New("key not found")
+		return map[string]ScalarValue{}, 0, errors.New("key not found")
 	}
 	if s.data[key].ValueType != KindDict {
-		return map[string]ScalarValue{}, errors.New("requested field is not of type dict")
+		return map[string]ScalarValue{}, 0, errors.New("requested field is not of type dict")
 	}
 
-	return value.Dict, nil
+	return value.Dict, s.data[key].ExpiresAt, nil
 }

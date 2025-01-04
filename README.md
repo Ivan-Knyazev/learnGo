@@ -23,7 +23,7 @@ go build cmd/storage/main.go
 
 Coverage of tests for `Storage`:
 ```
-ok  	go-storage/internal/pkg/storage	0.011s	coverage: 93.2% of statements
+ok  	go-storage/internal/pkg/storage	0.053s	coverage: 73.9% of statements
 ```
 
 <hr>

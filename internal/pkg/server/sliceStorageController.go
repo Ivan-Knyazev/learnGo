@@ -10,6 +10,12 @@ import (
 
 type SliceEntry struct {
 	Value []int `json:"value" binding:"required"`
+	TTL   int64 `json:"ttl" binding:"required"`
+}
+
+type SliceResponse struct {
+	Value     []int `json:"value" binding:"required"`
+	ExpiresAt int64 `json:"expiresAt" binding:"required"`
 }
 
 type PopSettings struct {
@@ -22,8 +28,19 @@ type SlicePopEntry struct {
 	Value  []int `json:"value" binding:"required"`
 }
 
+type SlicePopResponse struct {
+	Result    int   `json:"result" binding:"required"`
+	Value     []int `json:"value" binding:"required"`
+	ExpiresAt int64 `json:"expiresAt" binding:"required"`
+}
+
 type IntEntry struct {
 	Value int `json:"value" binding:"required"`
+}
+
+type IntResponse struct {
+	Value     int   `json:"value" binding:"required"`
+	ExpiresAt int64 `json:"expiresAt" binding:"required"`
 }
 
 // func NewPopSettings() *PopSettings {
@@ -34,12 +51,12 @@ type IntEntry struct {
 func (r *Server) sliceGet(ctx *gin.Context) {
 	key := ctx.Param("key")
 
-	value, err := r.Storage.GetSlice(key)
+	value, expiresAt, err := r.Storage.GetSlice(key)
 	if err != nil {
 		ctx.AbortWithError(http.StatusNotFound, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, SliceEntry{Value: value})
+	ctx.JSON(http.StatusOK, SliceResponse{Value: value, ExpiresAt: expiresAt})
 }
 
 func (r *Server) sliceGetValue(ctx *gin.Context) {
@@ -48,12 +65,12 @@ func (r *Server) sliceGetValue(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	} else {
-		value, err := r.Storage.GetSliceValue(key, index)
+		value, expiresAt, err := r.Storage.GetSliceValue(key, index)
 		if err != nil {
 			ctx.AbortWithError(http.StatusNotFound, err)
 			return
 		}
-		ctx.JSON(http.StatusOK, IntEntry{Value: value})
+		ctx.JSON(http.StatusOK, IntResponse{Value: value, ExpiresAt: expiresAt})
 	}
 }
 
@@ -77,12 +94,12 @@ func (r *Server) sliceSetValue(ctx *gin.Context) {
 		return
 	}
 
-	value, err := r.Storage.GetSlice(key)
+	value, expiresAt, err := r.Storage.GetSlice(key)
 	if err != nil {
 		ctx.AbortWithError(http.StatusNotFound, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, SliceEntry{Value: value})
+	ctx.JSON(http.StatusOK, SliceResponse{Value: value, ExpiresAt: expiresAt})
 }
 
 func (r *Server) sliceLeftPush(ctx *gin.Context) {
@@ -95,17 +112,17 @@ func (r *Server) sliceLeftPush(ctx *gin.Context) {
 		return
 	}
 
-	if err := r.Storage.LeftPushIntoSlice(key, newElements.Value...); err != nil {
+	if err := r.Storage.LeftPushIntoSlice(newElements.TTL, key, newElements.Value...); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	value, err := r.Storage.GetSlice(key)
+	value, expiresAt, err := r.Storage.GetSlice(key)
 	if err != nil {
 		ctx.AbortWithError(http.StatusNotFound, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, SliceEntry{Value: value})
+	ctx.JSON(http.StatusOK, SliceResponse{Value: value, ExpiresAt: expiresAt})
 }
 
 func (r *Server) sliceRightPush(ctx *gin.Context) {
@@ -118,17 +135,17 @@ func (r *Server) sliceRightPush(ctx *gin.Context) {
 		return
 	}
 
-	if err := r.Storage.RightPushIntoSlice(key, newElements.Value...); err != nil {
+	if err := r.Storage.RightPushIntoSlice(newElements.TTL, key, newElements.Value...); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	value, err := r.Storage.GetSlice(key)
+	value, expiresAt, err := r.Storage.GetSlice(key)
 	if err != nil {
 		ctx.AbortWithError(http.StatusNotFound, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, SliceEntry{Value: value})
+	ctx.JSON(http.StatusOK, SliceResponse{Value: value, ExpiresAt: expiresAt})
 }
 
 func (r *Server) sliceRightUniquePush(ctx *gin.Context) {
@@ -141,17 +158,17 @@ func (r *Server) sliceRightUniquePush(ctx *gin.Context) {
 		return
 	}
 
-	if err := r.Storage.RightUniquePushIntoSlice(key, newElements.Value...); err != nil {
+	if err := r.Storage.RightUniquePushIntoSlice(newElements.TTL, key, newElements.Value...); err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	value, err := r.Storage.GetSlice(key)
+	value, expiresAt, err := r.Storage.GetSlice(key)
 	if err != nil {
 		ctx.AbortWithError(http.StatusNotFound, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, SliceEntry{Value: value})
+	ctx.JSON(http.StatusOK, SliceResponse{Value: value, ExpiresAt: expiresAt})
 }
 
 func (r *Server) sliceLeftPop(ctx *gin.Context) {
@@ -171,12 +188,13 @@ func (r *Server) sliceLeftPop(ctx *gin.Context) {
 		return
 	}
 
-	value, err := r.Storage.GetSlice(key)
+	value, expiresAt, err := r.Storage.GetSlice(key)
+	fmt.Println(r.Storage.GetSlice(key))
 	if err != nil {
 		ctx.AbortWithError(http.StatusNotFound, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, SlicePopEntry{Result: result, Value: value})
+	ctx.JSON(http.StatusOK, SlicePopResponse{Result: result, Value: value, ExpiresAt: expiresAt})
 }
 
 func (r *Server) sliceRightPop(ctx *gin.Context) {
@@ -195,10 +213,10 @@ func (r *Server) sliceRightPop(ctx *gin.Context) {
 		return
 	}
 
-	value, err := r.Storage.GetSlice(key)
+	value, expiresAt, err := r.Storage.GetSlice(key)
 	if err != nil {
 		ctx.AbortWithError(http.StatusNotFound, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, SlicePopEntry{Result: result, Value: value})
+	ctx.JSON(http.StatusOK, SlicePopResponse{Result: result, Value: value, ExpiresAt: expiresAt})
 }

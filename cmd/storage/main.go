@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -25,9 +26,17 @@ func main() {
 	// envs["path"] = "../../storage.json"
 	// envs["port"] = "8090"
 
-	if err = utils.ReadFromFile(storageObj, envs["path"]); err != nil {
+	if err = storage.ReadFromFile(storageObj, envs["path"]); err != nil {
 		log.Println(err)
 	}
+
+	// Start cleen old data and save state in interval
+	closeChan := make(chan struct{})
+	interval, err := strconv.Atoi(envs["interval"])
+	if err != nil {
+		log.Println(err)
+	}
+	storageObj.StartScheduling(closeChan, int64(interval), storageObj, envs["path"])
 
 	host := fmt.Sprintf("0.0.0.0:%s", envs["port"])
 	s := server.NewServer(host, storageObj)
@@ -43,21 +52,28 @@ func main() {
 	<-quit
 	s.Storage.WriteLog("Shutdown Server ...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	timeout, err := strconv.Atoi(envs["timeout"])
+	if err != nil {
+		log.Println(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(int64(timeout))*time.Second)
 	defer cancel()
 	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Fatal("Server Shutdown:", err)
 	}
 
+	// Stop scheduling
+	close(closeChan)
+
 	// Save state
 	s.Storage.WriteLog("Save state of Storage ...")
-	if err := utils.WriteToFile(storageObj, envs["path"]); err != nil {
+	if err := storage.WriteToFile(storageObj, envs["path"]); err != nil {
 		log.Fatal(err)
 	}
 
-	// Catching ctx.Done(). Timeout of 5 seconds
+	// Catching ctx.Done(). Timeout of <timeout> seconds
 	<-ctx.Done()
-	log.Println("timeout of 5 seconds")
+	log.Printf("timeout of %d seconds", timeout)
 	s.Storage.WriteLog("Server exiting")
 }
 
