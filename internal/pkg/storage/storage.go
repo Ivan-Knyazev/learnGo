@@ -31,8 +31,11 @@ type Storage interface {
 	// Methods for marshalling data for work with JSON
 	LoadData(newData JsonStorage)
 	ExportData() JsonStorage
+	// Methods for save and read data
+	SaveData() error
+	ReadData() error
 	// Method for Scheduling
-	StartScheduling(closeChan chan struct{}, shedulerInterval int64, storageObj Storage, JSONPath string)
+	StartScheduling(closeChan chan struct{}, shedulerInterval int64, storageObj Storage)
 	// Write logs
 	WriteLog(info string)
 	WriteLogWithParametr(info string, data any)
@@ -48,9 +51,9 @@ const (
 )
 
 type ScalarValue struct {
-	ScalarValueType   ScalarKind `json:"ScalarValueType"`
-	ScalarValueInt    int64      `json:"ScalarValueInt"`
-	ScalarValueString string     `json:"ScalarValueString"`
+	ScalarValueType   ScalarKind `json:"scalarValueType"`
+	ScalarValueInt    int64      `json:"scalarValueInt"`
+	ScalarValueString string     `json:"scalarValueString"`
 }
 
 // main type Value
@@ -72,9 +75,10 @@ type Value struct {
 
 // storage struct - implementation of Storage interface
 type storage struct {
-	data   map[string]Value
-	Logger *zap.Logger
-	mutex  sync.Mutex
+	data         map[string]Value
+	Logger       *zap.Logger
+	saveStrategy Saver
+	mutex        sync.Mutex
 }
 
 // Create a new zap logger config
@@ -90,7 +94,7 @@ func newConfig() zap.Config {
 }
 
 // Create a new storage
-func NewStorage() (Storage, error) {
+func NewStorage(saver Saver) (Storage, error) {
 
 	config := newConfig()
 	logger := zap.Must(config.Build())
@@ -105,16 +109,17 @@ func NewStorage() (Storage, error) {
 	logger.Info("created new storage")
 
 	storage := &storage{
-		data:   make(map[string]Value),
-		Logger: logger,
-		mutex:  sync.Mutex{},
+		data:         make(map[string]Value),
+		Logger:       logger,
+		saveStrategy: saver,
+		mutex:        sync.Mutex{},
 	}
 	return storage, nil
 }
 
-func (s *storage) StartScheduling(closeChan chan struct{}, shedulerInterval int64, storageObj Storage, JSONPath string) {
+func (s *storage) StartScheduling(closeChan chan struct{}, shedulerInterval int64, storageObj Storage) {
 	interval := time.Duration(shedulerInterval) * time.Second
-	go scheduler(s, closeChan, interval, storageObj, JSONPath)
+	go scheduler(s, closeChan, interval, storageObj)
 	s.WriteLog("Start scheduling")
 }
 
@@ -142,4 +147,12 @@ func (s *storage) WriteLog(info string) {
 func (s *storage) WriteLogWithParametr(info string, data any) {
 	s.Logger.Info(fmt.Sprintf("[server] %s", info), zap.Any("data", data))
 	defer s.Logger.Sync()
+}
+
+func (s *storage) SaveData() error {
+	return s.saveStrategy.SaveData(s)
+}
+
+func (s *storage) ReadData() error {
+	return s.saveStrategy.ReadData(s)
 }

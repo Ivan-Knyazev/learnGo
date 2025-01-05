@@ -24,7 +24,8 @@ var casesValue = []testCaseValue{
 var ttl int64 = 3153600000
 
 func TestSetGetWithType(t *testing.T) {
-	testStorage, err := NewStorage()
+	strategy := CreateJSONSaver("")
+	testStorage, err := NewStorage(strategy)
 	if err != nil {
 		panic(err)
 	}
@@ -74,7 +75,8 @@ var casesSlicePUSH = []testCasePUSH{
 }
 
 func TestLPUSH(t *testing.T) {
-	testStorage, err := NewStorage()
+	strategy := CreateJSONSaver("")
+	testStorage, err := NewStorage(strategy)
 	if err != nil {
 		panic(err)
 	}
@@ -193,7 +195,8 @@ func checkPOP(testStorage Storage, test testCasePOP, t *testing.T, popType int) 
 	}
 }
 func TestPOP(t *testing.T) {
-	testStorage, err := NewStorage()
+	strategy := CreateJSONSaver("")
+	testStorage, err := NewStorage(strategy)
 	if err != nil {
 		panic(err)
 	}
@@ -229,7 +232,8 @@ var casesSliceLSET = []testCaseLSET{
 }
 
 func TestLSET(t *testing.T) {
-	testStorage, err := NewStorage()
+	strategy := CreateJSONSaver("")
+	testStorage, err := NewStorage(strategy)
 	if err != nil {
 		panic(err)
 	}
@@ -275,7 +279,8 @@ var casesSliceLGET = []testCaseLGET{
 }
 
 func TestLLGET(t *testing.T) {
-	testStorage, err := NewStorage()
+	strategy := CreateJSONSaver("")
+	testStorage, err := NewStorage(strategy)
 	if err != nil {
 		panic(err)
 	}
@@ -307,7 +312,8 @@ func TestLLGET(t *testing.T) {
 }
 
 func BenchmarkGet(b *testing.B) {
-	testStorage, err := NewStorage()
+	strategy := CreateJSONSaver("")
+	testStorage, err := NewStorage(strategy)
 	if err != nil {
 		panic(err)
 	}
@@ -331,7 +337,8 @@ func BenchmarkGet(b *testing.B) {
 }
 
 func BenchmarkSet(b *testing.B) {
-	testStorage, err := NewStorage()
+	strategy := CreateJSONSaver("")
+	testStorage, err := NewStorage(strategy)
 	if err != nil {
 		panic(err)
 	}
@@ -350,7 +357,8 @@ func BenchmarkSet(b *testing.B) {
 }
 
 func BenchmarkSetGet(b *testing.B) {
-	testStorage, err := NewStorage()
+	strategy := CreateJSONSaver("")
+	testStorage, err := NewStorage(strategy)
 	if err != nil {
 		panic(err)
 	}

@@ -2,18 +2,17 @@ package storage
 
 import (
 	"fmt"
-	"log"
 	"time"
 )
 
-func scheduler(storage *storage, closeChan chan struct{}, interval time.Duration, storageObj Storage, JSONPath string) {
+func scheduler(storage *storage, closeChan chan struct{}, interval time.Duration, storageObj Storage) {
 	for {
 		select {
 		case <-closeChan:
 			return
 		case <-time.After(interval):
 			clean(storage)
-			saveState(storageObj, JSONPath)
+			storageObj.SaveData()
 		}
 	}
 }
@@ -27,11 +26,5 @@ func clean(storage *storage) {
 			delete(storage.data, key)
 			storage.WriteLog(fmt.Sprintf("Delete Value with key=%s", key))
 		}
-	}
-}
-
-func saveState(storageObj Storage, path string) {
-	if err := WriteToFile(storageObj, path); err != nil {
-		log.Fatal(err)
 	}
 }

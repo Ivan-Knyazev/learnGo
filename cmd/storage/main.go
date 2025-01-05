@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"go-storage/internal/pkg/database"
 	"go-storage/internal/pkg/server"
 	"go-storage/internal/pkg/storage"
 	"go-storage/internal/pkg/utils"
@@ -15,20 +16,36 @@ import (
 )
 
 func main() {
-	storageObj, err := storage.NewStorage()
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	envs := utils.GetEnvs(storageObj) // Comment to debug
+	envs := utils.GetEnvs() // Comment to debug
+	logString := fmt.Sprintf("ENV was loaded, JSON_PATH=%s, PORT=%s", envs["path"], envs["port"])
 	// For debug in VS Code
 	// envs := make(map[string]string)
 	// envs["path"] = "../../storage.json"
 	// envs["port"] = "8090"
 
-	if err = storage.ReadFromFile(storageObj, envs["path"]); err != nil {
-		log.Println(err)
+	// Connect to PostgreSQL
+	db, err := database.Connect()
+	if err != nil {
+		log.Fatal("failed to connect to database:", err)
 	}
+
+	// Create strategy and storage
+	strategy := storage.CreateDBSaver(db)
+	storageObj, err := storage.NewStorage(strategy)
+	if err != nil {
+		log.Fatal(err)
+	}
+	storageObj.WriteLog(logString)
+
+	// For Read from JSON and write to DB
+	// if err = storage.ReadFromFile(storageObj, envs["path"]); err != nil {
+	// 	log.Println(err)
+	// }
+	// if err = storage.WriteToDB(storageObj, db); err != nil {
+	// 	log.Println(err)
+	// }
+	storageObj.ReadData()
 
 	// Start cleen old data and save state in interval
 	closeChan := make(chan struct{})
@@ -36,7 +53,7 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
-	storageObj.StartScheduling(closeChan, int64(interval), storageObj, envs["path"])
+	storageObj.StartScheduling(closeChan, int64(interval), storageObj)
 
 	host := fmt.Sprintf("0.0.0.0:%s", envs["port"])
 	s := server.NewServer(host, storageObj)
@@ -67,15 +84,33 @@ func main() {
 
 	// Save state
 	s.Storage.WriteLog("Save state of Storage ...")
-	if err := storage.WriteToFile(storageObj, envs["path"]); err != nil {
-		log.Fatal(err)
-	}
+	storageObj.SaveData()
 
 	// Catching ctx.Done(). Timeout of <timeout> seconds
 	<-ctx.Done()
 	log.Printf("timeout of %d seconds", timeout)
 	s.Storage.WriteLog("Server exiting")
 }
+
+// For work with JSON
+// ----
+// if err = storage.ReadFromFile(storageObj, envs["path"]); err != nil {
+// 	log.Println(err)
+// }
+// if err := storage.WriteToFile(storageObj, envs["path"]); err != nil {
+// 	log.Fatal(err)
+// }
+// ----
+
+// For work with DB
+// ----
+// if err = storage.ReadFromDB(storageObj, db); err != nil {
+// 	log.Println(err)
+// }
+// if err = storage.WriteToDB(storageObj, db); err != nil {
+// 	log.Println(err)
+// }
+// ----
 
 // storageObj.SetScalar("int", "1243232432")
 // storageObj.SetScalar("string", "test_string-tatata rarara")

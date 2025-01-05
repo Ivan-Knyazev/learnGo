@@ -83,19 +83,17 @@
 		"testSlice": {
 			"valueType": "SL",
 			"scalar": {
-				"ScalarValueType": "",
-				"ScalarValueInt": 0,
-				"ScalarValueString": ""
+				"scalarValueType": "",
+				"scalarValueInt": 0,
+				"scalarValueString": ""
 			},
 			"slice": [
-				1,
-				2,
-				3,
-				3,
-				10
+				7,
+				8,
+				70
 			],
 			"dict": {},
-			"expiresAt": 4889546214898
+			"expiresAt": 4889605569995
 		}
 	}
 }

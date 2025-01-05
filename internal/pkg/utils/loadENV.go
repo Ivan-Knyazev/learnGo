@@ -2,14 +2,13 @@ package utils
 
 import (
 	"fmt"
-	"go-storage/internal/pkg/storage"
 	"log"
 	"os"
 
 	"github.com/joho/godotenv"
 )
 
-func GetEnvs(s storage.Storage) map[string]string {
+func GetEnvs() map[string]string {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("error loading .env file")
@@ -21,8 +20,12 @@ func GetEnvs(s storage.Storage) map[string]string {
 	envs["interval"] = os.Getenv("INTERVAL")
 	envs["timeout"] = os.Getenv("SHUTDOWN_TIMEOUT")
 
-	logString := fmt.Sprintf("ENV was loaded, JSON_PATH=%s, PORT=%s", envs["path"], envs["port"])
-	defer s.WriteLog(logString)
+	// Create DSN (Data Source Name)
+	POSTGRES_DB := os.Getenv("POSTGRES_DB")
+	POSTGRES_USER := os.Getenv("POSTGRES_USER")
+	POSTGRES_PASSWORD := os.Getenv("POSTGRES_PASSWORD")
+	POSTGRES_PORT := os.Getenv("POSTGRES_PORT")
+	envs["DSN"] = fmt.Sprintf("host=localhost user=%s password=%s dbname=%s port=%s sslmode=disable", POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_PORT)
 
 	return envs
 }
