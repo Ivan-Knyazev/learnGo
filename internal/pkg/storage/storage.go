@@ -1,46 +1,103 @@
 package storage
 
 import (
-	"encoding/json"
-	"strconv"
+	"fmt"
+	"sync"
+	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-type value struct {
-	valueType    uint8      // Type of field used (0 - valueInt, 1 - valueFloat, ...)
-	valueInt     int64      // type 0
-	valueFloat   float64    // type 1
-	valueBool    bool       // type 2
-	valueComplex complex128 // type 3
-	valueString  string     // type 4
-	// valueAny     any
+// Storage interface
+type Storage interface {
+	// Methods for scalar
+	SetScalar(ttl int64, key string, val string) error
+	GetScalar(key string) (string, bool, int64)
+	GetScalarKind(key string) ScalarKind
+	// Methods for dict
+	SetDictFields(ttl int64, key string, elements ...string) (int, error) // HSET
+	GetDictField(key string, field string) (ScalarValue, int64, error)    // HGET
+	GetDict(key string) (map[string]ScalarValue, int64, error)
+	// Methods for slice
+	GetSlice(key string) ([]int, int64, error)
+	LeftPushIntoSlice(ttl int64, key string, elements ...int) error        // LPUSH
+	RightPushIntoSlice(ttl int64, key string, elements ...int) error       // RPUSH
+	RightUniquePushIntoSlice(ttl int64, key string, elements ...int) error // RADDTOSET
+	LeftPopFromSlice(key string, count ...int) (int, error)                // LPOP
+	RightPopFromSlice(key string, count ...int) (int, error)               // RPOP
+	SetSliceValue(key string, index int, element int) error                // LSET
+	GetSliceValue(key string, index int) (int, int64, error)               // LGET
+	// Methods for marshalling data for work with JSON
+	LoadData(newData JsonStorage)
+	ExportData() JsonStorage
+	// Methods for save and read data
+	SaveData() error
+	ReadData() error
+	// Method for Scheduling
+	StartScheduling(closeChan chan struct{}, shedulerInterval int64, storageObj Storage)
+	// Write logs
+	WriteLog(info string)
+	WriteLogWithParametr(info string, data any)
 }
 
-type Storage struct {
-	innerString map[string]value
-	logger      *zap.Logger
+// type ScalarValue
+type ScalarKind string
+
+const (
+	ScalarKindInt       ScalarKind = "D"
+	ScalarKindString    ScalarKind = "S"
+	ScalarKindUndefined ScalarKind = "UN"
+)
+
+type ScalarValue struct {
+	ScalarValueType   ScalarKind `json:"scalarValueType"`
+	ScalarValueInt    int64      `json:"scalarValueInt"`
+	ScalarValueString string     `json:"scalarValueString"`
 }
 
-func NewStorage() (Storage, error) {
+// main type Value
+type Kind string
 
-	rawJSON := []byte(`{
-		"level": "warn",
-		"encoding": "json",
-		"outputPaths": ["stdout", "/tmp/logs"],
-		"errorOutputPaths": ["stderr"],
-		"encoderConfig": {
-		  "messageKey": "message",
-		  "levelKey": "level",
-		  "levelEncoder": "lowercase"
-		}
-	}`)
+const (
+	KindScalar Kind = "SC"
+	KindSlice  Kind = "SL"
+	KindDict   Kind = "D"
+)
 
-	var cfg zap.Config
-	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
-		panic(err)
+type Value struct {
+	ValueType Kind                   `json:"valueType"`
+	Scalar    ScalarValue            `json:"scalar"`
+	Slice     []int                  `json:"slice"`
+	Dict      map[string]ScalarValue `json:"dict"`
+	ExpiresAt int64                  `json:"expiresAt"`
+}
+
+// storage struct - implementation of Storage interface
+type storage struct {
+	data         map[string]Value
+	Logger       *zap.Logger
+	saveStrategy Saver
+	mutex        sync.Mutex
+}
+
+// Create a new zap logger config
+func newConfig() zap.Config {
+	return zap.Config{
+		Level:            zap.NewAtomicLevelAt(zapcore.InfoLevel),
+		Development:      false,
+		Encoding:         "json",
+		EncoderConfig:    zap.NewProductionEncoderConfig(),
+		OutputPaths:      []string{"stdout", "/tmp/go-storage-logs"},
+		ErrorOutputPaths: []string{"stderr"},
 	}
-	logger := zap.Must(cfg.Build())
+}
+
+// Create a new storage
+func NewStorage(saver Saver) (Storage, error) {
+
+	config := newConfig()
+	logger := zap.Must(config.Build())
 	defer logger.Sync()
 
 	// logger, err := zap.NewProduction()
@@ -51,113 +108,51 @@ func NewStorage() (Storage, error) {
 	logger.Info("logger construction succeeded")
 	logger.Info("created new storage")
 
-	return Storage{
-		innerString: make(map[string]value),
-		logger:      logger,
-	}, nil
+	storage := &storage{
+		data:         make(map[string]Value),
+		Logger:       logger,
+		saveStrategy: saver,
+		mutex:        sync.Mutex{},
+	}
+	return storage, nil
 }
 
-func (s Storage) Set(key string, val string) {
-
-	s.logger.Info("key was set", zap.String("key", key), zap.Any("value", val))
-	defer s.logger.Sync()
-
-	// Check to int64
-	valueInt, err := strconv.ParseInt(val, 10, 64)
-	if err == nil {
-		s.innerString[key] = value{valueType: 0, valueInt: valueInt}
-		return
-	}
-
-	// Check to Float
-	valueFloat, err := strconv.ParseFloat(val, 64)
-	if err == nil {
-		s.innerString[key] = value{valueType: 1, valueFloat: valueFloat}
-		return
-	}
-
-	// Check to Bool
-	valueBool, err := strconv.ParseBool(val)
-	if err == nil {
-		s.innerString[key] = value{valueType: 2, valueBool: valueBool}
-		return
-	}
-
-	// Check to Complex
-	valueComplex, err := strconv.ParseComplex(val, 128)
-	if err == nil {
-		s.innerString[key] = value{valueType: 3, valueComplex: valueComplex}
-		return
-	}
-
-	// Is string
-	s.innerString[key] = value{valueType: 4, valueString: val}
+func (s *storage) StartScheduling(closeChan chan struct{}, shedulerInterval int64, storageObj Storage) {
+	interval := time.Duration(shedulerInterval) * time.Second
+	go scheduler(s, closeChan, interval, storageObj)
+	s.WriteLog("Start scheduling")
 }
 
-func (s Storage) Get(key string) *string {
-	val, ok := s.get(key)
-	if !ok {
-		return nil
-	}
+// For Marshalling
+type JsonStorage struct {
+	Data map[string]Value `json:"data"`
+}
 
-	switch valueType := val.valueType; valueType {
-	case 0:
-		strInt := strconv.FormatInt(val.valueInt, 10)
-		return &strInt
-	case 1:
-		strFloat := strconv.FormatFloat(val.valueFloat, 'f', -1, 64)
-		return &strFloat
-	case 2:
-		strBool := strconv.FormatBool(val.valueBool)
-		return &strBool
-	case 3:
-		strComplex := strconv.FormatComplex(val.valueComplex, 'f', -1, 64)
-		return &strComplex
-	// case 4:
-	// 	return &val.valueString
-	default:
-		return &val.valueString
+func (s *storage) LoadData(newData JsonStorage) {
+	s.data = newData.Data
+}
+
+func (s *storage) ExportData() JsonStorage {
+	return JsonStorage{
+		Data: s.data,
 	}
 }
 
-func (s Storage) get(key string) (value, bool) {
-	val, ok := s.innerString[key]
-	if !ok {
-		return value{}, false
-	}
-
-	return val, true
+// For logging
+func (s *storage) WriteLog(info string) {
+	s.Logger.Info(fmt.Sprintf("[server] %s", info))
+	defer s.Logger.Sync()
 }
 
-type Kind string
+func (s *storage) WriteLogWithParametr(info string, data any) {
+	s.Logger.Info(fmt.Sprintf("[server] %s", info), zap.Any("data", data))
+	defer s.Logger.Sync()
+}
 
-const (
-	KindInt       Kind = "D" // type 0
-	KindFloat     Kind = "F" // type 1
-	KindBool      Kind = "B" // type 2
-	KindComplex   Kind = "C" // type 3
-	KindString    Kind = "S" // type 4
-	KindUndefined Kind = "UN"
-)
+func (s *storage) SaveData() error {
+	return s.saveStrategy.SaveData(s)
+}
 
-func (s Storage) GetKind(key string) Kind {
-	value, ok := s.innerString[key]
-	if !ok {
-		return KindUndefined
-	}
-
-	switch valueType := value.valueType; valueType {
-	case 0:
-		return KindInt
-	case 1:
-		return KindFloat
-	case 2:
-		return KindBool
-	case 3:
-		return KindComplex
-	case 4:
-		return KindString
-	default:
-		return KindUndefined
-	}
+func (s *storage) ReadData() error {
+	return s.saveStrategy.ReadData(s)
 }

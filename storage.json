@@ -1,0 +1,99 @@
+{
+	"data": {
+		"int": {
+			"valueType": "SC",
+			"scalar": {
+				"ScalarValueType": "D",
+				"ScalarValueInt": 1243232432,
+				"ScalarValueString": ""
+			},
+			"slice": [],
+			"dict": {},
+			"expiresAt": 4889544141463
+		},
+		"slice1": {
+			"valueType": "SL",
+			"scalar": {
+				"ScalarValueType": "",
+				"ScalarValueInt": 0,
+				"ScalarValueString": ""
+			},
+			"slice": [
+				1,
+				10,
+				3,
+				5,
+				8,
+				4,
+				10,
+				11
+			],
+			"dict": {},
+			"expiresAt": 4889544141463
+		},
+		"string": {
+			"valueType": "SC",
+			"scalar": {
+				"ScalarValueType": "S",
+				"ScalarValueInt": 0,
+				"ScalarValueString": "test_string-tatata rarara"
+			},
+			"slice": [],
+			"dict": {},
+			"expiresAt": 4889544141463
+		},
+		"test": {
+			"valueType": "SC",
+			"scalar": {
+				"ScalarValueType": "D",
+				"ScalarValueInt": 4567,
+				"ScalarValueString": ""
+			},
+			"slice": [],
+			"dict": {},
+			"expiresAt": 4889544060126
+		},
+		"testDict": {
+			"valueType": "D",
+			"scalar": {
+				"ScalarValueType": "",
+				"ScalarValueInt": 0,
+				"ScalarValueString": ""
+			},
+			"slice": [],
+			"dict": {
+				"int": {
+					"ScalarValueType": "D",
+					"ScalarValueInt": 34271,
+					"ScalarValueString": ""
+				},
+				"str": {
+					"ScalarValueType": "S",
+					"ScalarValueInt": 0,
+					"ScalarValueString": "tatata"
+				},
+				"str1": {
+					"ScalarValueType": "S",
+					"ScalarValueInt": 0,
+					"ScalarValueString": "tatata"
+				}
+			},
+			"expiresAt": 4889544141463
+		},
+		"testSlice": {
+			"valueType": "SL",
+			"scalar": {
+				"scalarValueType": "",
+				"scalarValueInt": 0,
+				"scalarValueString": ""
+			},
+			"slice": [
+				7,
+				8,
+				70
+			],
+			"dict": {},
+			"expiresAt": 4889605569995
+		}
+	}
+}
