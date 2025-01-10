@@ -51,9 +51,9 @@ ok  	go-storage/internal/pkg/storage	0.060s	coverage: 42.1% of statements
 
 ## TODO
 
-[] Дописать HTTP тесты
-[] Добавить `Swagger`
-[] Докеризовать хранилище
+- [] Дописать HTTP тесты
+- [] Добавить `Swagger`
+- [] Докеризовать хранилище
 
 <hr>
 
